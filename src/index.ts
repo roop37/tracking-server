@@ -5,10 +5,11 @@ import { analyticsEventsQueue } from "./utils/queue";
 import { enrichEvent, looksLikeBot } from "./utils/enrich";
 
 /**
- * tracking-server — accepts analytics events from every Hoizr frontend
- * (`hoizr-client`, `business-client`, `hoizr-admin`, `hoizr-artist-client`)
- * via a single `POST /track` endpoint, enriches them with IP/UA/visitor
- * hash, then enqueues to `analyticsEventsQueue` for the worker to persist.
+ * tracking-server — ingests CUSTOMER behaviour only. The single client is
+ * the customer storefront (`hoizr-client`); the host/admin/artist consoles
+ * do NOT send analytics here. Events arrive via a single `POST /track`
+ * endpoint, are enriched with IP/UA/visitor hash, then enqueued to
+ * `analyticsEventsQueue` for the worker to persist.
  *
  * Deliberately a separate Node process from main-server / customer-server
  * because (a) it's a high-write, no-read surface and shouldn't share the
@@ -27,9 +28,12 @@ import { enrichEvent, looksLikeBot } from "./utils/enrich";
 const app = Fastify({ logger: false });
 
 const PORT = Number(process.env.PORT ?? 4100);
+// Customer storefront only — hoizr-client (prod + dev) and its localhost
+// port. Host/admin/artist origins are intentionally NOT here: this server
+// ingests customer behaviour, nothing else.
 const allowedOrigins = (
   process.env.TRACKING_CORS_ORIGINS ??
-  "https://www.hoizr.com,https://hoizr.com,https://business.hoizr.com,https://admin.hoizr.com,https://artists.hoizr.com,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5000"
+  "https://www.hoizr.com,https://hoizr.com,http://localhost:3002"
 )
   .split(",")
   .map((s) => s.trim())
