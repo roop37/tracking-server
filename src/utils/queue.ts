@@ -1,5 +1,5 @@
 import { Queue } from "bullmq";
-import { QueueNames } from "@hoizr-technology/shared";
+import { QueueNames } from "@hoizr-technology/shared/dist/queue/queue";
 import { redisClient } from "./redis";
 
 /**

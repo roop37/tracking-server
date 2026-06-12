@@ -13,6 +13,7 @@
     "@fastify/helmet": "^12.0.1",
     "@hoizr-technology/shared": "^0.1.93",
     "bullmq": "^5.13.2",
+    "dotenv": "^16.6.1",
     "fastify": "^5.1.0",
     "ioredis": "^5.4.1",
     "ua-parser-js": "^1.0.39"

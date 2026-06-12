@@ -1,10 +1,63 @@
 import crypto from "node:crypto";
 import UAParser from "ua-parser-js";
-import {
-  AnalyticsEventType,
-  DeviceType,
-  TrafficSource,
-} from "@hoizr-technology/shared";
+
+// Keep these string values aligned with hoizr-shared's analytics enums without
+// importing the shared enum module at runtime; that module registers GraphQL
+// enums and pulls GraphQL/Mongoose peers into this lightweight ingest process.
+enum AnalyticsEventType {
+  PageView = "pageView",
+  Identify = "identify",
+  ClickGeneric = "clickGeneric",
+  Search = "search",
+  Error = "error",
+  EventListView = "eventListView",
+  EventListFilter = "eventListFilter",
+  EventDetailView = "eventDetailView",
+  EventShare = "eventShare",
+  EventFavorite = "eventFavorite",
+  TicketSelect = "ticketSelect",
+  CartCreated = "cartCreated",
+  CartUpdated = "cartUpdated",
+  CartExpired = "cartExpired",
+  CheckoutStarted = "checkoutStarted",
+  CheckoutPaymentInit = "checkoutPaymentInit",
+  CheckoutPaymentFailed = "checkoutPaymentFailed",
+  CheckoutCompleted = "checkoutCompleted",
+  ArtistListView = "artistListView",
+  ArtistDetailView = "artistDetailView",
+  ArtistFollow = "artistFollow",
+  ArtistMerchListView = "artistMerchListView",
+  ArtistMerchDetailView = "artistMerchDetailView",
+  ArtistMerchPurchased = "artistMerchPurchased",
+  HostDetailView = "hostDetailView",
+  HostFollow = "hostFollow",
+  AuthOtpRequested = "authOtpRequested",
+  AuthOtpVerified = "authOtpVerified",
+  AuthSignupCompleted = "authSignupCompleted",
+  AuthLogin = "authLogin",
+  AuthLogout = "authLogout",
+  CampaignEmailOpened = "campaignEmailOpened",
+  CampaignEmailClicked = "campaignEmailClicked",
+}
+
+enum TrafficSource {
+  Direct = "direct",
+  Organic = "organic",
+  Paid = "paid",
+  Social = "social",
+  Email = "email",
+  Referral = "referral",
+  Internal = "internal",
+  Unknown = "unknown",
+}
+
+enum DeviceType {
+  Desktop = "desktop",
+  Mobile = "mobile",
+  Tablet = "tablet",
+  Bot = "bot",
+  Unknown = "unknown",
+}
 
 const VISITOR_SALT = process.env.VISITOR_HASH_SALT ?? "hoizr-visitor";
 
