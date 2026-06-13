@@ -32,12 +32,19 @@ const PORT = Number(process.env.PORT ?? 4100);
 // Customer storefront only — hoizr-client (prod + dev) and its localhost
 // port. Host/admin/artist origins are intentionally NOT here: this server
 // ingests customer behaviour, nothing else.
+//
+// Trailing slashes are stripped so `https://dev.hoizr.com/` from a sloppy env
+// still matches the browser's `Origin: https://dev.hoizr.com` (which never has
+// one). Any `*.hoizr.com` / apex `hoizr.com` https origin is also accepted as a
+// safety net so a forgotten env entry on a new subdomain can't silently break
+// tracking again.
+const stripSlash = (s: string): string => s.replace(/\/+$/, "");
 const allowedOrigins = (
   process.env.TRACKING_CORS_ORIGINS ??
-  "https://www.hoizr.com,https://hoizr.com,http://localhost:3002"
+  "https://www.hoizr.com,https://hoizr.com,https://dev.hoizr.com,http://localhost:3002"
 )
   .split(",")
-  .map((s) => s.trim())
+  .map((s) => stripSlash(s.trim()))
   .filter(Boolean);
 
 const extractIp = (req: FastifyRequest): string => {
@@ -68,17 +75,40 @@ async function start() {
     }
   };
 
+  // Any https origin under hoizr.com (apex or subdomain). Customer traffic only
+  // ever comes from a hoizr.com host, so this is a safe fallback that survives a
+  // missing env entry for a freshly-provisioned subdomain.
+  const isHoizrOrigin = (origin: string): boolean => {
+    try {
+      const u = new URL(origin);
+      return (
+        u.protocol === "https:" &&
+        (u.hostname === "hoizr.com" || u.hostname.endsWith(".hoizr.com"))
+      );
+    } catch {
+      return false;
+    }
+  };
+
   await app.register(cors, {
     origin: (origin, cb) => {
       // Allow same-origin / no-origin (server-side fetch / sendBeacon),
-      // any localhost port in dev, and the explicit allow-list otherwise.
+      // any localhost port in dev, any hoizr.com origin, and the explicit
+      // allow-list otherwise.
       if (!origin) return cb(null, true);
-      if (isLocalhostOrigin(origin)) return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
+      const o = stripSlash(origin);
+      if (isLocalhostOrigin(o)) return cb(null, true);
+      if (isHoizrOrigin(o)) return cb(null, true);
+      if (allowedOrigins.includes(o)) return cb(null, true);
+      // Reject WITHOUT throwing: @fastify/cors then simply omits the
+      // Access-Control-Allow-Origin header (browser blocks the response)
+      // instead of returning a 500 — a thrown error here surfaces in the
+      // browser as a confusing "CORS error" on an otherwise-200 endpoint.
       console.warn(`[tracking-server] CORS reject: ${origin}`);
-      cb(new Error("Origin not allowed"), false);
+      cb(null, false);
     },
     methods: ["POST", "GET", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
     credentials: false,
   });
 
