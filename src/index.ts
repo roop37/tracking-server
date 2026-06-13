@@ -109,7 +109,14 @@ async function start() {
     },
     methods: ["POST", "GET", "OPTIONS"],
     allowedHeaders: ["Content-Type"],
-    credentials: false,
+    // MUST be true: the client uses `navigator.sendBeacon`, which ALWAYS sends
+    // the request with credentials (cookies) included. A credentialed
+    // cross-origin request is blocked by the browser unless the response
+    // carries `Access-Control-Allow-Credentials: true` (with a specific, non-*
+    // Allow-Origin — which the origin callback above already returns). Without
+    // this, beacons fail the CORS check even though plain fetch/curl succeed.
+    // The server ignores the cookies; this only satisfies the browser.
+    credentials: true,
   });
 
   // ─── Health check ────────────────────────────────────────────────
