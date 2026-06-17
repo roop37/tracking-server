@@ -4,43 +4,19 @@ import UAParser from "ua-parser-js";
 // Keep these string values aligned with hoizr-shared's analytics enums without
 // importing the shared enum module at runtime; that module registers GraphQL
 // enums and pulls GraphQL/Mongoose peers into this lightweight ingest process.
+// The only event types we accept. This is the ingest gate — anything not
+// listed here is dropped with `unknown_event_type`, so the funnel stays
+// tiny no matter what a stale client sends.
+//   pageView      — every route change (event-list / detail views are
+//                   derived from `route` at report time)
+//   cartCreated   — feeds the abandoned-cart automation
+//   cartDestroyed — buyer discarded an active cart
+//   orderPlaced   — server-emitted conversion (customer-server)
 enum AnalyticsEventType {
   PageView = "pageView",
-  Identify = "identify",
-  ClickGeneric = "clickGeneric",
-  Search = "search",
-  Error = "error",
-  EventListView = "eventListView",
-  EventViewList = "eventViewList",
-  EventListFilter = "eventListFilter",
-  EventDetailView = "eventDetailView",
-  EventShare = "eventShare",
-  EventFavorite = "eventFavorite",
-  TicketSelect = "ticketSelect",
   CartCreated = "cartCreated",
-  CartUpdated = "cartUpdated",
-  CartExpired = "cartExpired",
-  CheckoutStarted = "checkoutStarted",
-  CheckoutTriggered = "checkoutTriggered",
-  CheckoutPaymentInit = "checkoutPaymentInit",
-  CheckoutPaymentFailed = "checkoutPaymentFailed",
-  CheckoutCompleted = "checkoutCompleted",
+  CartDestroyed = "cartDestroyed",
   OrderPlaced = "orderPlaced",
-  ArtistListView = "artistListView",
-  ArtistDetailView = "artistDetailView",
-  ArtistFollow = "artistFollow",
-  ArtistMerchListView = "artistMerchListView",
-  ArtistMerchDetailView = "artistMerchDetailView",
-  ArtistMerchPurchased = "artistMerchPurchased",
-  HostDetailView = "hostDetailView",
-  HostFollow = "hostFollow",
-  AuthOtpRequested = "authOtpRequested",
-  AuthOtpVerified = "authOtpVerified",
-  AuthSignupCompleted = "authSignupCompleted",
-  AuthLogin = "authLogin",
-  AuthLogout = "authLogout",
-  CampaignEmailOpened = "campaignEmailOpened",
-  CampaignEmailClicked = "campaignEmailClicked",
 }
 
 enum TrafficSource {
@@ -213,15 +189,20 @@ export const enrichEvent = (
   const trunc = (v: any, max: number) =>
     typeof v === "string" ? v.slice(0, max) : v;
 
+  // Lean by design: every field here is a column in Mongo on every event.
+  // We keep only what's queried — identity/stitching, entity refs, the
+  // route, attribution, and a coarse device class. Raw UA / IP / full URL /
+  // page title / query / version strings are derived-from then dropped, so
+  // a single event stays well under a kilobyte.
   return {
     eventType: body.eventType,
 
+    // Identity + stitching
     visitorHash: visitorHashOf(ip, userAgent),
     sessionId: trunc(body?.sessionId, 64),
     customerId: trunc(body?.customerId, 64),
-    userId: trunc(body?.userId, 64),
-    artistId: trunc(body?.artistId, 64),
 
+    // Entity references
     eventId: trunc(body?.eventId, 64),
     hostId: trunc(body?.hostId, 64),
     orderId: trunc(body?.orderId, 64),
@@ -232,13 +213,11 @@ export const enrichEvent = (
           .map((s: string) => s.slice(0, 64))
       : undefined,
 
-    pageUrl: trunc(body?.pageUrl, 2048),
+    // Route only — page-level funnels are derived from this at report time.
     route: trunc(body?.route, 256),
-    pageTitle: trunc(body?.pageTitle, 256),
-    pageQuery: trunc(body?.pageQuery, 1024),
-    referrer: trunc(body?.referrer, 2048),
-    referrerHost,
 
+    // Attribution (raw referrer is used to derive these two, then discarded)
+    referrerHost,
     utmSource: trunc(body?.utmSource, 128),
     utmMedium: trunc(body?.utmMedium, 128),
     utmCampaign: trunc(body?.utmCampaign, 128),
@@ -246,21 +225,12 @@ export const enrichEvent = (
     utmContent: trunc(body?.utmContent, 128),
     trafficSource,
 
-    userAgent: trunc(userAgent, 512),
+    // Coarse device class only (no raw UA, no version strings)
     deviceType: classifyDevice(parsed),
     browser: parsed.browser.name,
-    browserVersion: parsed.browser.version,
     os: parsed.os.name,
-    osVersion: parsed.os.version,
-    viewport: trunc(body?.viewport, 16),
-    language: trunc(body?.language, 16),
-    timezone: trunc(body?.timezone, 64),
 
-    ip,
-    // country + city are filled by a downstream IP-lookup pass; left
-    // empty here so the tracking-server stays fast (no synchronous geo
-    // lookup on the hot path).
-
+    // Event-specific bag — keep it small at the call site.
     metadata:
       body?.metadata && typeof body.metadata === "object"
         ? Object.fromEntries(
@@ -274,7 +244,6 @@ export const enrichEvent = (
     clientTimestamp: body?.clientTimestamp
       ? new Date(body.clientTimestamp)
       : undefined,
-    origin: trunc(origin, 256),
     app: trunc(body?.app, 64),
   };
 };
