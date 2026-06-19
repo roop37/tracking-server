@@ -9,13 +9,22 @@ import UAParser from "ua-parser-js";
 // tiny no matter what a stale client sends.
 //   pageView      — every route change (event-list / detail views are
 //                   derived from `route` at report time)
-//   cartCreated   — feeds the abandoned-cart automation
+//   cartCreated   — feeds the abandoned-cart automation (≈ ticket selected)
 //   cartDestroyed — buyer discarded an active cart
+//   paymentStarted— buyer opened the Razorpay payment sheet (funnel: payment stage)
+//   paymentFailed — payment attempt failed / dismissed (funnel: payment drop-off)
 //   orderPlaced   — server-emitted conversion (customer-server)
+//
+// The funnel (event view → ticket selected → checkout → payment → paid) is
+// reconstructed from these + `pageView.route` — we add ONLY the steps that
+// route-derivation can't see (the Razorpay payment stage). Every type here is
+// a row in Mongo forever, so the list stays deliberately tiny.
 enum AnalyticsEventType {
   PageView = "pageView",
   CartCreated = "cartCreated",
   CartDestroyed = "cartDestroyed",
+  PaymentStarted = "paymentStarted",
+  PaymentFailed = "paymentFailed",
   OrderPlaced = "orderPlaced",
 }
 
