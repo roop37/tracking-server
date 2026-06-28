@@ -1,6 +1,16 @@
 import { Queue } from "bullmq";
-import { QueueNames } from "@hoizr-technology/shared";
 import { redisClient } from "./redis";
+
+/**
+ * Queue name — kept as a LOCAL literal on purpose. Importing it from
+ * `@hoizr-technology/shared` pulls that package's barrel, which transitively
+ * `require`s `type-graphql` (via its GraphQL enums). tracking-server is a
+ * lightweight ingest process that does NOT install type-graphql, so any shared
+ * import crashes it on boot (MODULE_NOT_FOUND) → PM2 crash-loop → nginx 502 →
+ * the browser surfaces it as a "CORS error". Keep this string byte-identical to
+ * `QueueNames.analyticsEventsQueue` in hoizr-shared so the worker drains it.
+ */
+const ANALYTICS_EVENTS_QUEUE = "{analytics-events-queue}";
 
 /**
  * Payload shape pushed onto `analyticsEventsQueue`. The worker
@@ -11,7 +21,7 @@ import { redisClient } from "./redis";
 export type AnalyticsEventJob = Record<string, any>;
 
 export const analyticsEventsQueue = new Queue<AnalyticsEventJob>(
-  QueueNames.analyticsEventsQueue,
+  ANALYTICS_EVENTS_QUEUE,
   {
     connection: redisClient,
     defaultJobOptions: {

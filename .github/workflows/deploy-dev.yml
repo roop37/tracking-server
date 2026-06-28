@@ -1,0 +1,66 @@
+name: Deploy to dev droplet
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-tracking-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify deploy secrets
+        env:
+          SSH_KEY: ${{ secrets.DROPLET_SSH_KEY }}
+          HOST: ${{ secrets.DROPLET_HOST }}
+          USER_NAME: ${{ secrets.DROPLET_USER }}
+        run: |
+          echo "::group::Secret presence (no content leaked)"
+          if [ -z "$HOST" ]; then echo "::error::DROPLET_HOST is empty"; exit 1; fi
+          if [ -z "$USER_NAME" ]; then echo "::error::DROPLET_USER is empty"; exit 1; fi
+          if [ -z "$SSH_KEY" ]; then echo "::error::DROPLET_SSH_KEY is empty"; exit 1; fi
+          echo "DROPLET_HOST     length=${#HOST}"
+          echo "DROPLET_USER     value=$USER_NAME"
+          echo "DROPLET_SSH_KEY  length=${#SSH_KEY} (expect ~400+ for ed25519)"
+          FIRST=$(printf "%s" "$SSH_KEY" | head -1)
+          LAST=$(printf "%s" "$SSH_KEY" | tail -1)
+          LINES=$(printf "%s" "$SSH_KEY" | wc -l)
+          echo "key first line: $FIRST"
+          echo "key last  line: $LAST"
+          echo "key line count: $LINES (expect 7+ for ed25519)"
+          if ! printf "%s" "$FIRST" | grep -q "BEGIN .*PRIVATE KEY"; then
+            echo "::error::Key does not start with a BEGIN ... PRIVATE KEY header - paste was corrupted in GitHub UI"
+            exit 1
+          fi
+          if ! printf "%s" "$LAST" | grep -q "END .*PRIVATE KEY"; then
+            echo "::error::Key does not end with an END ... PRIVATE KEY footer"
+            exit 1
+          fi
+          if [ "$LINES" -lt 6 ]; then
+            echo "::error::Key looks collapsed onto fewer than 6 lines - newlines were stripped during paste"
+            exit 1
+          fi
+          echo "::notice::Key format checks passed"
+          echo "::endgroup::"
+
+      - name: SSH + run deploy.sh on droplet
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          command_timeout: 9m
+          debug: true
+          script: |
+            echo "=== SSH connected ==="
+            echo "host  : $(hostname)"
+            echo "user  : $(whoami)"
+            echo "date  : $(date -Is)"
+            echo "pwd   : $(pwd)"
+            echo "=== Running deploy.sh tracking-server ==="
+            /home/hoizr/hoizr-stack/deploy.sh tracking-server
