@@ -1,13 +1,14 @@
 name: Deploy to production droplet
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
   group: deploy-prod-${{ github.repository }}
   cancel-in-progress: false
+
+env:
+  SERVICE_NAME: tracking-server
 
 jobs:
   deploy:
@@ -15,31 +16,27 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - name: Verify deploy secrets
+      - name: Verify deploy configuration
         env:
           SSH_KEY: ${{ secrets.PROD_DROPLET_SSH_KEY }}
           HOST: ${{ secrets.PROD_DROPLET_HOST }}
           USER_NAME: ${{ secrets.PROD_DROPLET_USER }}
-          SERVICE_NAME: ${{ vars.SERVICE_NAME }}
+          SERVICE_NAME: ${{ env.SERVICE_NAME }}
         run: |
           echo "::group::Secret presence (no content leaked)"
           if [ -z "$HOST" ]; then echo "::error::PROD_DROPLET_HOST is empty"; exit 1; fi
           if [ -z "$USER_NAME" ]; then echo "::error::PROD_DROPLET_USER is empty"; exit 1; fi
           if [ -z "$SSH_KEY" ]; then echo "::error::PROD_DROPLET_SSH_KEY is empty"; exit 1; fi
-          if [ -z "$SERVICE_NAME" ]; then echo "::error::SERVICE_NAME variable is empty"; exit 1; fi
+          if [ -z "$SERVICE_NAME" ]; then echo "::error::SERVICE_NAME env is empty"; exit 1; fi
 
           echo "PROD_DROPLET_HOST     length=${#HOST}"
           echo "PROD_DROPLET_USER     value=$USER_NAME"
           echo "SERVICE_NAME          value=$SERVICE_NAME"
           echo "PROD_DROPLET_SSH_KEY  length=${#SSH_KEY}"
 
-          FIRST=$(printf "%s" "$SSH_KEY" | head -1)
-          LAST=$(printf "%s" "$SSH_KEY" | tail -1)
-          LINES=$(printf "%s" "$SSH_KEY" | wc -l)
-
-          echo "key first line: $FIRST"
-          echo "key last  line: $LAST"
-          echo "key line count: $LINES"
+          FIRST=$(printf "%s" "$SSH_KEY" | sed -n '1p')
+          LAST=$(printf "%s" "$SSH_KEY" | tail -n 1)
+          LINES=$(printf "%s" "$SSH_KEY" | wc -l | tr -d ' ')
 
           if ! printf "%s" "$FIRST" | grep -q "BEGIN .*PRIVATE KEY"; then
             echo "::error::Key does not start with a BEGIN ... PRIVATE KEY header"
@@ -56,7 +53,7 @@ jobs:
             exit 1
           fi
 
-          echo "::notice::Key format checks passed"
+          echo "::notice::Deploy configuration checks passed"
           echo "::endgroup::"
 
       - name: SSH and deploy service
@@ -66,13 +63,13 @@ jobs:
           username: ${{ secrets.PROD_DROPLET_USER }}
           key: ${{ secrets.PROD_DROPLET_SSH_KEY }}
           command_timeout: 20m
-          debug: true
+          debug: false
           script: |
             echo "=== SSH connected ==="
             echo "host    : $(hostname)"
             echo "user    : $(whoami)"
             echo "date    : $(date -Is)"
-            echo "service : ${{ vars.SERVICE_NAME }}"
+            echo "service : ${{ env.SERVICE_NAME }}"
             echo "branch  : main"
             echo "=== Running deploy.sh ==="
-            /home/hoizr/hoizr-stack/deploy.sh ${{ vars.SERVICE_NAME }} main
+            /home/hoizr/hoizr-stack/deploy.sh ${{ env.SERVICE_NAME }} main
