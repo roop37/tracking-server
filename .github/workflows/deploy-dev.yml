@@ -55,7 +55,7 @@ jobs:
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           command_timeout: 9m
-          debug: true
+          debug: false
           script: |
             echo "=== SSH connected ==="
             echo "host  : $(hostname)"
