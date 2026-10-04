@@ -4,7 +4,7 @@
 
 Write-only analytics ingest for Hoizr: filters and enriches storefront events, queues them to BullMQ, keeps no raw IPs.
 
-[Hoizr walkthrough](https://github.com/Hoizr-Technology/hoizr-walkthrough) · [Architecture](https://github.com/Hoizr-Technology/hoizr-walkthrough/blob/main/docs/01-system-architecture.md) · [Local setup](https://github.com/Hoizr-Technology/hoizr-walkthrough/blob/main/docs/09-local-development.md) · [Contributing](https://github.com/Hoizr-Technology/.github/blob/main/CONTRIBUTING.md)
+[Hoizr walkthrough](https://github.com/roop37/hoizr-walkthrough) · [Architecture](https://github.com/roop37/hoizr-walkthrough/blob/main/docs/01-system-architecture.md) · [Local setup](https://github.com/roop37/hoizr-walkthrough/blob/main/docs/09-local-development.md) · [Contributing](https://github.com/roop37/hoizr-dotgithub/blob/main/CONTRIBUTING.md)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Fastify 5](https://img.shields.io/badge/Fastify-5-000000?logo=fastify&logoColor=white)](https://fastify.dev/docs/latest/)
@@ -36,7 +36,7 @@ The customer storefront posts behaviour events to this service. tracking-server 
 
 Hoizr is an event ticketing, fan CRM, marketing and door-scanning platform for venues and event organizers in India. This repository is its analytics ingest edge: a small Fastify process (four TypeScript files) that accepts page views and checkout-funnel events from the customer storefront, drops Do-Not-Track and bot traffic, and turns each request into a compact, privacy-reduced record on a queue. It reads each visitor's raw IP address from the request and uses it only as an input to a salted, daily-rotating hash.
 
-It runs as its own process so that a high-write, no-read surface stays off the GraphQL servers' hot path and keeps accepting beacons while those servers deploy ([src/index.ts](src/index.ts)). For the full system, start with the [Hoizr walkthrough](https://github.com/Hoizr-Technology/hoizr-walkthrough).
+It runs as its own process so that a high-write, no-read surface stays off the GraphQL servers' hot path and keeps accepting beacons while those servers deploy ([src/index.ts](src/index.ts)). For the full system, start with the [Hoizr walkthrough](https://github.com/roop37/hoizr-walkthrough).
 
 ## Contents
 
@@ -63,7 +63,7 @@ It runs as its own process so that a high-write, no-read surface stays off the G
 - **Consent and noise handled at the edge.** A `DNT: 1` header or a User-Agent matching one of 17 crawler, headless-browser and uptime-monitor hints gets an empty `204` before any enrichment or Redis work: [src/index.ts](src/index.ts#L129-L140), [`BOT_HINTS`](src/utils/enrich.ts#L147-L170).
 - **Tracking never breaks the page.** The status contract is deliberate: `202` accepted, `204` dropped or internal error, `400` only for caller bugs. The handler's `catch` answers `204`, so the browser SDK stays quiet: [src/index.ts](src/index.ts#L156-L161).
 - **CORS that works with `navigator.sendBeacon`.** Beacons always carry credentials, so the server reflects a specific origin with `credentials: true`, and it rejects unknown origins with `cb(null, false)` instead of throwing, which avoids a 500 that browsers would report as a CORS failure: [src/index.ts](src/index.ts#L93-L120).
-- **Runtime-decoupled from the shared package.** The queue name and enum values are local literals kept byte-identical to [`hoizr-shared`](https://github.com/Hoizr-Technology/hoizr-shared), because importing that package's barrel pulls in `type-graphql` and crashed this lightweight process on boot: [src/utils/queue.ts](src/utils/queue.ts).
+- **Runtime-decoupled from the shared package.** The queue name and enum values are local literals kept byte-identical to [`hoizr-shared`](https://github.com/roop37/hoizr-shared), because importing that package's barrel pulls in `type-graphql` and crashed this lightweight process on boot: [src/utils/queue.ts](src/utils/queue.ts).
 - **Best-effort queue with short retention.** `{analytics-events-queue}` uses a hash tag, the Hoizr-wide convention that keeps all of a queue's keys in one Redis Cluster slot (this process itself connects with a single-node ioredis client). Jobs get two attempts with exponential backoff, completed jobs are trimmed after 60 seconds and failed ones after 24 hours, so finished jobs do not pile up in Redis. Jobs still waiting for a worker are not trimmed: [src/utils/queue.ts](src/utils/queue.ts).
 - **Bounded payloads.** Every string field copied from the request body has a length cap, `itemIds` and `metadata` are cut at 50 entries, and a batch holds at most 50 events: [src/utils/enrich.ts](src/utils/enrich.ts#L195-L251), [src/index.ts](src/index.ts#L176-L181).
 
@@ -73,7 +73,7 @@ It runs as its own process so that a high-write, no-read surface stays off the G
 
 - `POST /track` for one event and `POST /track/batch` for up to 50 events that share one request context.
 - Fire-and-forget responses that the SDK can ignore: nothing the server does surfaces as a page error.
-- CORS tuned for `sendBeacon` and `fetch(..., { keepalive: true })`, the two transports the [storefront SDK](https://github.com/Hoizr-Technology/hoizr-client/blob/main/src/lib/tracker.ts) uses.
+- CORS tuned for `sendBeacon` and `fetch(..., { keepalive: true })`, the two transports the [storefront SDK](https://github.com/roop37/hoizr-client/blob/main/src/lib/tracker.ts) uses.
 
 **For visitors' privacy**
 
@@ -110,7 +110,7 @@ Versions are the manifest ranges in [package.json](package.json), with the exact
 | ua-parser-js | ^1.0.39 (1.0.41) | User-Agent to device type, browser and OS. Pinned to the MIT-licensed 1.x line; check the 2.x license before upgrading | [ua-parser-js](https://github.com/faisalman/ua-parser-js) |
 | dotenv | ^16.6.1 (16.6.1) | Loads `.env` at startup | [dotenv](https://github.com/motdotla/dotenv) |
 | ts-node-dev | ^2.0.0 (2.0.0) | Hot reload for `npm run dev` | [ts-node-dev](https://github.com/wclr/ts-node-dev) |
-| @hoizr-technology/shared | ^0.1.119 (0.1.119) | Declared but **not imported** anywhere in `src/` (see [Known limitations](#known-limitations)) | [hoizr-shared](https://github.com/Hoizr-Technology/hoizr-shared) |
+| @hoizr-technology/shared | ^0.1.119 (0.1.119) | Declared but **not imported** anywhere in `src/` (see [Known limitations](#known-limitations)) | [hoizr-shared](https://github.com/roop37/hoizr-shared) |
 
 SHA-256 comes from Node's built-in `node:crypto`. Package manager: npm (only `package-lock.json` is committed).
 
@@ -312,7 +312,7 @@ Never enqueued: the raw IP, the raw User-Agent, the full referrer URL, browser a
 | Payload | the enriched object above |
 | Job options | `attempts: 2`, exponential backoff from 2 s, completed jobs kept 60 s (max 1000), failed jobs kept 24 h (max 1000) |
 | Producers | this service, and customer-server for `orderPlaced` |
-| Consumer | the [analytics-events worker](https://github.com/Hoizr-Technology/hoizr-worker/blob/main/src/workers/analytics-events/analytics-events.worker.ts) in `hoizr-worker`, concurrency 10 |
+| Consumer | the [analytics-events worker](https://github.com/roop37/hoizr-worker/blob/main/src/workers/analytics-events/analytics-events.worker.ts) in `hoizr-worker`, concurrency 10 |
 
 </details>
 
@@ -323,12 +323,12 @@ Never enqueued: the raw IP, the raw User-Agent, the full referrer URL, browser a
 - **Node.js 20 or newer.** Fastify 5 supports only Node.js 20 and later. The repo has no `.nvmrc`, `engines` field or Dockerfile.
 - **npm**, matching the committed `package-lock.json`.
 - **Redis.** To have events persisted, use the same Redis instance as `hoizr-worker`. For local work, a local Redis container is enough, for example `docker run --rm -p 6379:6379 redis:7-alpine`.
-- **Optional:** [`hoizr-worker`](https://github.com/Hoizr-Technology/hoizr-worker) plus MongoDB to persist events, and [`hoizr-client`](https://github.com/Hoizr-Technology/hoizr-client) to produce real ones. MongoDB is not needed by this service.
+- **Optional:** [`hoizr-worker`](https://github.com/roop37/hoizr-worker) plus MongoDB to persist events, and [`hoizr-client`](https://github.com/roop37/hoizr-client) to produce real ones. MongoDB is not needed by this service.
 
 ### Install
 
 ```bash
-git clone https://github.com/Hoizr-Technology/tracking-server.git
+git clone https://github.com/roop37/tracking-server.git
 cd tracking-server
 ```
 
@@ -407,7 +407,7 @@ Without a worker running, accepted jobs wait in Redis. You can count them with `
 
 - **Storefront:** in `hoizr-client`, set `NEXT_PUBLIC_TRACKING_SERVER_URL=http://localhost:4100`. When that variable is empty, the SDK silently sends nothing.
 - **Persistence:** run `hoizr-worker` against the same Redis and a MongoDB instance; it writes to the `analytics_events` collection.
-- The [local development chapter](https://github.com/Hoizr-Technology/hoizr-walkthrough/blob/main/docs/09-local-development.md) of the walkthrough shows how all services run together.
+- The [local development chapter](https://github.com/roop37/hoizr-walkthrough/blob/main/docs/09-local-development.md) of the walkthrough shows how all services run together.
 
 ### Deployment
 
@@ -435,7 +435,7 @@ To check a change today, run `npm run build` and the [smoke test](#smoke-test). 
 - **Missing operational basics.** No tests, lint or PR checks, no graceful shutdown (`SIGTERM` handling), no request logging or metrics, and the Node version is not pinned.
 - **Public beacon endpoint by design.** Ingest is unauthenticated, as browser beacons are. Rate limiting, signed ingest, a trusted-proxy configuration for client IPs, and narrowing the public allow-list to client-emitted types are on the roadmap. Downstream consumers should treat analytics rows as untrusted signals.
 
-See the walkthrough's [known gaps and roadmap](https://github.com/Hoizr-Technology/hoizr-walkthrough/blob/main/docs/12-known-gaps-and-roadmap.md) for the system-wide list.
+See the walkthrough's [known gaps and roadmap](https://github.com/roop37/hoizr-walkthrough/blob/main/docs/12-known-gaps-and-roadmap.md) for the system-wide list.
 
 ### Good first issues
 
@@ -447,29 +447,29 @@ See the walkthrough's [known gaps and roadmap](https://github.com/Hoizr-Technolo
 
 ## Contributing
 
-Hoizr was built by a very small team, and the author wants to grow it with the community. Issues, fixes and ideas are welcome, from a one-line comment correction to a new test suite. Please read the organization's [contributing guide](https://github.com/Hoizr-Technology/.github/blob/main/CONTRIBUTING.md) and [code of conduct](https://github.com/Hoizr-Technology/.github/blob/main/CODE_OF_CONDUCT.md) before opening a pull request.
+Hoizr was built by a very small team, and the author wants to grow it with the community. Issues, fixes and ideas are welcome, from a one-line comment correction to a new test suite. Please read the organization's [contributing guide](https://github.com/roop37/hoizr-dotgithub/blob/main/CONTRIBUTING.md) and [code of conduct](https://github.com/roop37/hoizr-dotgithub/blob/main/CODE_OF_CONDUCT.md) before opening a pull request.
 
 > [!IMPORTANT]
-> Please report security vulnerabilities privately, as described in the [security policy](https://github.com/Hoizr-Technology/.github/blob/main/SECURITY.md), not in public issues.
+> Please report security vulnerabilities privately, as described in the [security policy](https://github.com/roop37/hoizr-dotgithub/blob/main/SECURITY.md), not in public issues.
 
 ## Related repositories
 
 | Repository | Role |
 |---|---|
-| [hoizr-walkthrough](https://github.com/Hoizr-Technology/hoizr-walkthrough) | Guided tour of the whole system: architecture, flows, local setup |
-| [main-server](https://github.com/Hoizr-Technology/main-server) | Business, admin and artist GraphQL API (Fastify, Mercurius, TypeGraphQL), port 4000 |
-| [customer-server](https://github.com/Hoizr-Technology/customer-server) | Customer and scanner GraphQL API, cart, checkout and Razorpay webhooks, port 4001 |
-| [hoizr-worker](https://github.com/Hoizr-Technology/hoizr-worker) | BullMQ workers and node-cron jobs for every async side effect, including persisting these events |
-| [hoizr-shared](https://github.com/Hoizr-Technology/hoizr-shared) | `@hoizr-technology/shared`: Typegoose and TypeGraphQL domain model, enums, queue names, ledger, HMAC |
-| [hoizr-client](https://github.com/Hoizr-Technology/hoizr-client) | Customer storefront (Next.js 14 App Router) and the only sender of events to this service |
-| [business-client](https://github.com/Hoizr-Technology/business-client) | Dashboard for venues and event organizers, plus the business.hoizr.com marketing site |
-| [internal-admin-client](https://github.com/Hoizr-Technology/internal-admin-client) | Internal operations console (Next.js 14 App Router) |
-| [hoizr-artist-client](https://github.com/Hoizr-Technology/hoizr-artist-client) | Artist dashboard and editorial landing (Next.js 14 App Router) |
-| [hoizr-scanner-app](https://github.com/Hoizr-Technology/hoizr-scanner-app) | Flutter door check-in app with offline support |
+| [hoizr-walkthrough](https://github.com/roop37/hoizr-walkthrough) | Guided tour of the whole system: architecture, flows, local setup |
+| [main-server](https://github.com/roop37/main-server) | Business, admin and artist GraphQL API (Fastify, Mercurius, TypeGraphQL), port 4000 |
+| [customer-server](https://github.com/roop37/customer-server) | Customer and scanner GraphQL API, cart, checkout and Razorpay webhooks, port 4001 |
+| [hoizr-worker](https://github.com/roop37/hoizr-worker) | BullMQ workers and node-cron jobs for every async side effect, including persisting these events |
+| [hoizr-shared](https://github.com/roop37/hoizr-shared) | `@hoizr-technology/shared`: Typegoose and TypeGraphQL domain model, enums, queue names, ledger, HMAC |
+| [hoizr-client](https://github.com/roop37/hoizr-client) | Customer storefront (Next.js 14 App Router) and the only sender of events to this service |
+| [business-client](https://github.com/roop37/business-client) | Dashboard for venues and event organizers, plus the business.hoizr.com marketing site |
+| [internal-admin-client](https://github.com/roop37/internal-admin-client) | Internal operations console (Next.js 14 App Router) |
+| [hoizr-artist-client](https://github.com/roop37/hoizr-artist-client) | Artist dashboard and editorial landing (Next.js 14 App Router) |
+| [hoizr-scanner-app](https://github.com/roop37/hoizr-scanner-app) | Flutter door check-in app with offline support |
 
 ## Author
 
-Built by [@sanbedan-debox](https://github.com/sanbedan-debox) as part of Hoizr.
+Built by [@roop37](https://github.com/roop37) as part of Hoizr.
 
 ## License
 
